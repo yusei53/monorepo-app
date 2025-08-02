@@ -1,7 +1,32 @@
 import { neon, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import type { Context } from "hono";
+import { injectable } from "inversify";
 import ws from "ws";
+import * as schema from "./schema";
+
+export interface DbClientInterface {
+  init(c: Context): void;
+  getDb(): ReturnType<typeof connectToDatabase>;
+}
+
+@injectable()
+export class DbClient implements DbClientInterface {
+  private db!: ReturnType<typeof connectToDatabase>;
+
+  public init(c: Context): void {
+    if (!this.db) {
+      this.db = connectToDatabase(c);
+    }
+  }
+
+  getDb(): ReturnType<typeof connectToDatabase> {
+    if (!this.db) {
+      throw new Error("DbClient not initialized");
+    }
+    return this.db;
+  }
+}
 
 // ref: https://neon.com/guides/local-development-with-neon
 export const connectToDatabase = (c: Context) => {
@@ -24,6 +49,6 @@ export const connectToDatabase = (c: Context) => {
   neonConfig.webSocketConstructor = ws;
   const sql = neon(connectionString);
 
-  const db = drizzle(sql);
+  const db = drizzle(sql, { schema });
   return db;
 };
